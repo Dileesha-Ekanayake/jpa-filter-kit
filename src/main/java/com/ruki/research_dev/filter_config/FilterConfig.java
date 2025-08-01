@@ -1,7 +1,6 @@
 package com.ruki.research_dev.filter_config;
 
 import lk.dileesha.jpafilter.SpecificationBuilder;
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -9,7 +8,6 @@ import java.util.Arrays;
 import java.util.Map;
 
 @Configuration
-@RequiredArgsConstructor
 public class FilterConfig {
 
     @Bean
