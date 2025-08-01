@@ -315,14 +315,6 @@ public class User {
 
 }
 
-@Entity
-public class Gender {
-    @Id
-    private Long id;
-    private String name;
-    // getters and setters...
-}
-
 @Getter
 @Setter
 @Entity
