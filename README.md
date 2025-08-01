@@ -23,15 +23,17 @@
 ### Maven
 ```xml
 <dependency>
-    <groupId>lk.dileesha</groupId>
-    <artifactId>jpa-filter-kit</artifactId>
+    <groupId>io.github.dileesha-ekanayake</groupId>
+    <artifactId>specification-builder</artifactId>
     <version>1.0.0</version>
 </dependency>
 ```
 
 ### Gradle
 ```gradle
-implementation 'lk.dileesha:jpa-filter-kit:1.0.0'
+dependencies {
+    implementation("io.github.dileesha-ekanayake:specification-builder:1.0.0")
+}
 ```
 
 ## 🛠️ Quick Start
@@ -45,7 +47,6 @@ Create a configuration class to set up your filter mappings:
 @RequiredArgsConstructor
 public class FilterConfig {
 
-    @PostConstruct
     private void setupFilters() {
         SpecificationBuilder specBuilder = new SpecificationBuilder();
 
@@ -72,18 +73,16 @@ public class FilterConfig {
 
 ```java
 @RestController
+@RequestMapping("/employees")
 @RequiredArgsConstructor
-public class UserController {
-    
-    private final UserRepository userRepository;
-    private final SpecificationBuilder specBuilder;
-    
-    @GetMapping("/users")
-    public Page<User> getUsers(@RequestParam Map<String, String> filters,
-                              Pageable pageable) {
-        
-        Specification<User> spec = specBuilder.createFilterSpecifications(filters);
-        return userRepository.findAll(spec, pageable);
+public class EmployeeController {
+
+    private final EmployeeService employeeService;
+
+    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<List<EmployeeResponseDTO>> getAllEmployees(@RequestParam(required = false) HashMap<String, String> filters) {
+        List<EmployeeResponseDTO> employeeResponseDTOS = employeeService.getAllEmployees(filters);
+        return ResponseEntity.ok(employeeResponseDTOS);
     }
 }
 ```
@@ -92,8 +91,8 @@ public class UserController {
 
 ```java
 @Repository
-public interface UserRepository extends JpaRepository<User, Long>, 
-                                       JpaSpecificationExecutor<User> {
+public interface EmployeeRepository extends JpaRepository<Employee, Integer>,
+                                        JpaSpecificationExecutor<Employee> {
 }
 ```
 
@@ -103,57 +102,55 @@ public interface UserRepository extends JpaRepository<User, Long>,
 
 **Request:**
 ```
-GET /users?name=john&email=gmail
+GET /http://localhost:8080/employees?name=nimal
 ```
 
 **Generated Query:**
 ```sql
-SELECT * FROM users 
-WHERE LOWER(full_name) LIKE '%john%' 
-  AND LOWER(email) LIKE '%gmail%'
+SELECT * FROM employee 
+WHERE LOWER(name) LIKE '%nimal%'
 ```
 
 ### Nested Field Filtering
 
 **Request:**
 ```
-GET /users?genderid=1&roleid=2
+GET /http://localhost:8080/users?roleid=2
 ```
 
 **Generated Query:**
 ```sql
 SELECT * FROM users u
-LEFT JOIN gender g ON u.gender_id = g.id
 LEFT JOIN user_roles ur ON u.id = ur.user_id
 LEFT JOIN role r ON ur.role_id = r.id
-WHERE g.id = '1' AND r.id = '2'
+WHERE r.id = '2'
 ```
 
 ### Date Range Filtering
 
 **Request:**
 ```
-GET /users?dobirth-from=1990-01-01&dobirth-to=2000-12-31
+GET /http://localhost:8080/employees?dobirth-from=1990-01-01&dobirth-to=2000-12-12
 ```
 
 **Generated Query:**
 ```sql
 SELECT * FROM users 
 WHERE date_of_birth >= '1990-01-01' 
-  AND date_of_birth <= '2000-12-31'
+  AND date_of_birth <= '2000-12-12'
 ```
 
 ### Numeric Field Filtering
 
 **Request:**
 ```
-GET /users?id=123&count=5
+GET /http://localhost:8080/eusers?id=123
 ```
 
 **Generated Query:**
 ```sql
 SELECT * FROM users 
-WHERE id = '123' AND count = '5'
+WHERE id = '123'
 ```
 
 ## 🔧 Advanced Configuration
@@ -161,21 +158,16 @@ WHERE id = '123' AND count = '5'
 ### Using Builder Pattern
 
 ```java
-SpecificationBuilder specBuilder = SpecificationBuilder.builder()
-    .withSimpleField("name", "fullName")
-    .withSimpleField("email", "emailAddress")
-    .withNestedField("genderid", "gender.id")
-    .withNestedField("departmentid", "department.id")
-    .withDateField("dobirth", "dateOfBirth")
-    .withDateField("joindate", "joinDate")
-    .withNumericFields(Arrays.asList("id", "age", "salary"))
-    .withDateSuffixes(Map.of(
-        "-from", true,
-        "-to", false,
-        "-start", true,
-        "-end", false
-    ))
-    .build();
+@Bean
+public SpecificationBuilder userSpecificationBuilder() {
+    return SpecificationBuilder.builder()
+            .withNestedField("genderid", "gender.id")
+            .withDateField("dobirth", "dobirth")
+            .withNestedField("roleid", "userRoles.role.id")
+            .withNumericFields(Arrays.asList("id", "count"))
+            .withDateSuffixes(Map.of("-from", true, "-to", false))
+            .build();
+}
 ```
 
 ### Multiple Date Suffixes
@@ -298,29 +290,29 @@ log.info("Date fields: {}", dateFields);
 ### Complete Example with Entity
 
 ```java
+@Getter
+@Setter
 @Entity
-@Table(name = "users")
+@Table(name = "user")
 public class User {
     @Id
-    private Long id;
-    
-    @Column(name = "full_name")
-    private String fullName;
-    
-    @Column(name = "email")
-    private String email;
-    
-    @Column(name = "date_of_birth")
-    private LocalDate dateOfBirth;
-    
-    @ManyToOne
-    @JoinColumn(name = "gender_id")
-    private Gender gender;
-    
-    @OneToMany(mappedBy = "user")
-    private List<UserRole> userRoles;
-    
-    // getters and setters...
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id", nullable = false)
+    private Integer id;
+
+    @Column(name = "username", length = 45)
+    private String username;
+
+    @Column(name = "password")
+    private String password;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "employee_id", nullable = false)
+    private Employee employee;
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<UserRole> userRoles = new LinkedHashSet<>();
+
 }
 
 @Entity
@@ -331,17 +323,24 @@ public class Gender {
     // getters and setters...
 }
 
+@Getter
+@Setter
 @Entity
+@Table(name = "user_role")
 public class UserRole {
     @Id
-    private Long id;
-    
-    @ManyToOne
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id", nullable = false)
+    private Integer id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
-    
-    @ManyToOne
+
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @JoinColumn(name = "role_id", nullable = false)
     private Role role;
-    // getters and setters...
+
 }
 ```
 
@@ -350,27 +349,24 @@ public class UserRole {
 ```java
 @Service
 @RequiredArgsConstructor
-public class UserService {
-    
-    private final UserRepository userRepository;
-    private final SpecificationBuilder specBuilder;
-    
-    public Page<UserDTO> searchUsers(Map<String, String> filters, Pageable pageable) {
-        Specification<User> spec = specBuilder.createFilterSpecifications(filters);
-        Page<User> users = userRepository.findAll(spec, pageable);
-        return users.map(this::convertToDTO);
-    }
-    
-    public List<User> findUsersByComplexCriteria(String name, Long genderId, 
-                                                LocalDate birthFrom, LocalDate birthTo) {
-        Map<String, String> filters = new HashMap<>();
-        if (name != null) filters.put("name", name);
-        if (genderId != null) filters.put("genderid", genderId.toString());
-        if (birthFrom != null) filters.put("dobirth-from", birthFrom.toString());
-        if (birthTo != null) filters.put("dobirth-to", birthTo.toString());
-        
-        Specification<User> spec = specBuilder.createFilterSpecifications(filters);
-        return userRepository.findAll(spec);
+public class EmployeeServiceIMPL implements EmployeeService {
+
+    private final EmployeeRepository employeeRepository;
+    private final DTOMapper dtoMapper;
+    private final SpecificationBuilder specificationBuilder; // With @Bean Configuration
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<EmployeeResponseDTO> getAllEmployees(HashMap<String, String> filters) {
+        // SpecificationBuilder specificationBuilder = new SpecificationBuilder(); // Alternative
+        List<EmployeeResponseDTO> employeeResponseDTOS = dtoMapper.toEmployeeResponseDTOs(employeeRepository.findAll());
+
+        if (filters == null || filters.isEmpty()) {
+            return employeeResponseDTOS;
+        }
+
+        Specification<Employee> specification = specificationBuilder.createFilterSpecifications(filters);
+        return dtoMapper.toEmployeeResponseDTOs(employeeRepository.findAll(specification));
     }
 }
 ```
