@@ -161,10 +161,10 @@ WHERE id = '123'
 @Bean
 public SpecificationBuilder userSpecificationBuilder() {
     return SpecificationBuilder.builder()
-            .withNestedField("genderid", "gender.id")
-            .withDateField("dobirth", "dobirth")
-            .withNestedField("roleid", "userRoles.role.id")
             .withNumericFields(Arrays.asList("id", "count"))
+            .withNestedField("genderid", "gender.id")
+            .withNestedField("roleid", "userRoles.role.id")
+            .withDateField("dobirth", "dobirth")
             .withDateSuffixes(Map.of("-from", true, "-to", false))
             .build();
 }
